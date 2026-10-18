@@ -1,0 +1,27 @@
+name: Validate static app
+on:
+  push:
+  pull_request:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: |
+          node --check assets/app.js
+          node --check data/opportunities.js
+      - name: Check required files and source links
+        run: |
+          node - <<'NODE'
+          const fs=require('node:fs'),vm=require('node:vm');
+          for (const p of ['index.html','assets/styles.css','assets/app.js','data/opportunities.js','PRIVACY.md','README.md']) if(!fs.existsSync(p)) throw Error('Missing: '+p);
+          const sandbox={window:{}};vm.runInNewContext(fs.readFileSync('data/opportunities.js','utf8'),sandbox);
+          const arr=sandbox.window.ATLAS_OPPORTUNITIES;
+          if(!Array.isArray(arr)||arr.length<4) throw Error('Missing opportunity data');
+          for(const o of arr){if(!o.id||!o.title||!o.category||!o.next||!/^https:\/\//.test(o.url)) throw Error('Invalid source: '+JSON.stringify(o));}
+          console.log('Validated',arr.length,'directory sources');
+          NODE
